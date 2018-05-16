@@ -107,7 +107,7 @@ public class IpmFrame extends JFrame {
 							.extra(String.valueOf(message.getPacketNo()))
 							.build());
 				}
-				MessageDialog dialog = new MessageDialog(this, false, Arrays.asList(new User.Builder(message).build()), message.getBody());
+				MessageDialog dialog = new MessageDialog(this, false, message.is(Option.IPMSG_SECRETOPT), Arrays.asList(messanger.getUser(new User.Builder(message).build())), message.getPacketNo(), message.getBody());
 				dialog.setVisible(true);
 			});
 			//無操作
@@ -292,7 +292,7 @@ public class IpmFrame extends JFrame {
 
 	public void openDialog() {
 		// オブザーバで
-		MessageDialog dialog = new MessageDialog(this, true, userList.getSelectedValuesList());
+		MessageDialog dialog = new MessageDialog(this, true, false, userList.getSelectedValuesList());
 		dialog.setVisible(true);
 	}
 
@@ -314,14 +314,16 @@ public class IpmFrame extends JFrame {
 		if (secret) {
 			builder.option(Option.IPMSG_SECRETOPT);
 		}
-		messanger.send(builder
-				.build());
+		send(dialog, builder.build());
+	}
+	public void send(MessageDialog dialog, Message message) {
+		messanger.send(message);
 		//アラートスレッド
 		Thread alertThread = new Thread(()->{
 			try {
 				Thread.sleep(3_000); // 3秒後
-				if (dialogMap.containsKey(packetNo)) {
-					dialog.alert();
+				if (dialogMap.containsKey(message.getPacketNo())) {
+					dialog.alert(message);
 				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();
@@ -334,5 +336,15 @@ public class IpmFrame extends JFrame {
 		messanger.clearUser();
 		
 		entryIpm();
+	}
+	
+	public void notify(Mode mode, User user, long packetNo) {
+		messanger.send(new Message.Builder(user)
+				.packetNo(messanger.issuePacketNo())
+				.mode(mode)
+				.hostName(HOST)
+				.userName(USER)
+				.extra(String.valueOf(packetNo))
+				.build());
 	}
 }

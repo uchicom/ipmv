@@ -1,6 +1,8 @@
 package com.uchicom.ipmv.window;
 
 import java.awt.BorderLayout;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -11,10 +13,13 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
+import com.uchicom.ipm.Message;
 import com.uchicom.ipm.dto.User;
+import com.uchicom.ipm.type.Mode;
 import com.uchicom.ipmv.action.CancelAction;
 import com.uchicom.ipmv.action.OkAction;
 import com.uchicom.ipmv.action.ReplyAction;
+import com.uchicom.ipmv.action.SecretAction;
 import com.uchicom.ui.LineNumberView;
 
 /**
@@ -37,35 +42,57 @@ public class MessageDialog extends JDialog {
 	private IpmFrame frame;
 
 	private List<User> userList;
+	
+	private JButton secretButton;
+	
+	private Long packetNo;
+	
+	
+	private boolean opend;
 
-	public MessageDialog(IpmFrame frame, boolean editable, List<User> userList) {
+	public MessageDialog(IpmFrame frame, boolean editable, boolean secretable, List<User> userList) {
 		super(frame);
 		this.frame = frame;
 		this.userList = userList;
-		initComponent(editable);
+		initComponent(editable, secretable);
 	}
 
-	public MessageDialog(IpmFrame frame, boolean editable, List<User> userList, String text) {
+	public MessageDialog(IpmFrame frame, boolean editable, boolean secretable, List<User> userList, Long packetNo, String text) {
 		super(frame);
 		this.frame = frame;
 		this.userList = userList;
 		textArea.setText(text);
-		initComponent(editable);
+		initComponent(editable, secretable);
+		this.packetNo = packetNo;
 	}
 
-	private void initComponent(boolean editable) {
+	private void initComponent(boolean editable, boolean secretable) {
 		if (editable) {
 			setTitle("To:" + userList.toString());
 		} else {
 			setTitle("From:" + userList.get(0).toString());
 		}
+		
 		textArea.setEditable(editable);
 		BorderLayout layout = new BorderLayout();
 		getContentPane().setLayout(layout);
-		LineNumberView view = new LineNumberView(textArea);
-		JScrollPane scrollPane = new JScrollPane(textArea);
-		scrollPane.setRowHeaderView(view);
-		getContentPane().add(scrollPane, BorderLayout.CENTER);
+		if (secretable) {
+			secretButton = new JButton(new SecretAction(this));
+			getContentPane().add(secretButton, BorderLayout.CENTER);
+
+			addWindowListener(new WindowAdapter() {
+				@Override
+				public void windowClosing(WindowEvent e) {
+					if (!opend) {
+						frame.notify(Mode.IPMSG_DELMSG, userList.get(0), packetNo);
+						dispose();
+					}
+				}
+			});
+		} else {
+			display();
+		}
+		
 		JPanel controlPanel = new JPanel();
 		if (editable) {
 			controlPanel.add(new JButton(new OkAction(this)));
@@ -94,8 +121,10 @@ public class MessageDialog extends JDialog {
 		dispose();
 	}
 
-	public void alert() {
-		JOptionPane.showMessageDialog(this, "送信失敗かも");
+	public void alert(Message message) {
+		if (JOptionPane.OK_OPTION == JOptionPane.showConfirmDialog(this, "再送します赤？", "送信失敗", JOptionPane.OK_CANCEL_OPTION)) {
+			frame.send(this, message);
+		}
 	}
 
 	/**
@@ -105,10 +134,31 @@ public class MessageDialog extends JDialog {
 		dispose();
 		MessageDialog dialog = null;
 		if (checkbox.isSelected()) {
-			dialog = new MessageDialog(frame, true, userList, textArea.getText().replaceAll("^", "> ").replaceAll("\\n",  "\n> ") + "\n");
+			dialog = new MessageDialog(frame, true, false, userList, null, textArea.getText().replaceAll("^", "> ").replaceAll("\\n",  "\n> ") + "\n");
 		} else {
-			dialog = new MessageDialog(frame, true, userList);
+			dialog = new MessageDialog(frame, true, false, userList);
 		}
 		dialog.setVisible(true);
 	}
+	
+	/**
+	 * 封書を開ける
+	 */
+	public void open() {
+		opend = true;
+		getContentPane().remove(secretButton);
+		secretButton = null;
+		display();
+		frame.notify(Mode.IPMSG_READMSG, userList.get(0), packetNo);
+		pack();
+		repaint();
+	}
+	private void display() {
+		LineNumberView view = new LineNumberView(textArea);
+		JScrollPane scrollPane = new JScrollPane(textArea);
+		scrollPane.setRowHeaderView(view);
+		getContentPane().add(scrollPane, BorderLayout.CENTER);
+	}
+	
+	
 }
