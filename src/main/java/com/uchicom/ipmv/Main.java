@@ -1,29 +1,21 @@
 package com.uchicom.ipmv;
 
-import java.nio.IntBuffer;
+import java.awt.Font;
 
 import javax.swing.SwingUtilities;
 
+import com.jogamp.newt.event.WindowAdapter;
+import com.jogamp.newt.event.WindowEvent;
+import com.jogamp.newt.opengl.GLWindow;
+import com.jogamp.opengl.GL;
+import com.jogamp.opengl.GL2;
+import com.jogamp.opengl.GLAutoDrawable;
+import com.jogamp.opengl.GLCapabilities;
+import com.jogamp.opengl.GLEventListener;
+import com.jogamp.opengl.GLProfile;
+import com.jogamp.opengl.util.Animator;
+import com.jogamp.opengl.util.awt.TextRenderer;
 import com.uchicom.ipmv.window.IpmFrame;
-
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.scene.Group;
-import javafx.scene.PerspectiveCamera;
-import javafx.scene.Scene;
-import javafx.scene.SceneAntialiasing;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.image.PixelWriter;
-import javafx.scene.image.WritableImage;
-import javafx.scene.image.WritablePixelFormat;
-import javafx.scene.paint.Paint;
-import javafx.scene.paint.PhongMaterial;
-import javafx.scene.shape.Box;
-import javafx.scene.shape.Sphere;
-import javafx.scene.text.FontSmoothingType;
-import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 
 /**
  * ipmライブラリを利用したサンプルプログラム
@@ -31,7 +23,7 @@ import javafx.stage.StageStyle;
  * @author Shigeki.Uchiyama
  *
  */
-public class Main extends Application {
+public class Main implements GLEventListener {
 
 	public static void main(String[] args) {
 		if (args.length == 0) {
@@ -40,96 +32,81 @@ public class Main extends Application {
 				frame.setVisible(true);
 			});
 		} else {
-			launch();
+			new Main().newt();
 		}
 	}
-	private static final int WIDTH = 100;
-	private static final int HEIGHT = 100;
 
-	WritableImage image = new WritableImage(WIDTH, HEIGHT);
+	Animator animator;
+	int width = 300;
+	int height = 300;
 
-	Canvas canvas = new Canvas(WIDTH, HEIGHT);
-	GraphicsContext gc = canvas.getGraphicsContext2D();
+	public void newt() {
+		GLCapabilities caps = new GLCapabilities(GLProfile.get(GLProfile.GL2));// (2)
+		GLWindow glWindow = GLWindow.create(caps); // (3)
+		glWindow.setTitle("First demo (Newt)"); // (4)
+		glWindow.setSize(300, 300); // (5)
 
-	@Override
-	public void start(Stage stage) {
-		Group root = new Group();
-
-		//オブジェクト設定
-		Sphere sphere = new Sphere(20);
-		Box myBox = new Box(WIDTH, HEIGHT, 1);
-		
-		//テクスチャ設定
-		final PhongMaterial material = new PhongMaterial();
-		material.setDiffuseMap(image);
-		
-		sphere.setMaterial(material);
-		myBox.setMaterial(material);
-		myBox.setScaleZ(0.5);
-		myBox.setScaleY(0.5);
-		myBox.setScaleZ(0.5);
-
-//		root.getChildren().add(sphere);
-		root.getChildren().add(myBox);
-		
-		Scene scene = new Scene(root, 320, 320, true, SceneAntialiasing.BALANCED);
-		//カメラ3D
-		PerspectiveCamera camera = new PerspectiveCamera(true);
-		camera.setFieldOfView(80);
-		camera.setTranslateZ(-100.001);
-		camera.setTranslateY(10);
-		camera.setTranslateX(10);
-		scene.setCamera(camera);
-		stage.setScene(scene);
-		stage.setTitle("Hello, JavaFX 3D World!");
-		stage.setOpacity(0.5);
-		stage.setAlwaysOnTop(true);
-		
-		//枠削除
-		stage.initStyle(StageStyle.TRANSPARENT);
-		stage.getScene().setFill(null);
-		stage.getScene().getRoot().setStyle("-fx-background-color: transparent");
-		
-		stage.show();
-		//テクスチャが同的に変えられるかの確認スレッド
-		Thread thread = new Thread(() -> {
-			while (true) {
-				PixelWriter writer = image.getPixelWriter();
-				try {
-					Thread.sleep(1000);
-					//描画スレッドはこれを使う。
-					Platform.runLater(() ->{
-						drawShapes(gc);
-						WritableImage temp = canvas.snapshot(null, null);
-						WritablePixelFormat<IntBuffer> pf = WritablePixelFormat.getIntArgbInstance();
-						int[] img = new int[WIDTH * HEIGHT];
-						temp.getPixelReader().getPixels(0, 0, WIDTH, HEIGHT, pf, img, 0, WIDTH);
-						writer.setPixels(0, 0, WIDTH, HEIGHT, pf, img, 0, WIDTH);
-					});
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+		glWindow.addWindowListener(new WindowAdapter() { // (6)
+			@Override
+			public void windowDestroyed(WindowEvent evt) {
+				System.exit(0);
 			}
 		});
-		thread.setDaemon(true);
-		thread.start();
+		glWindow.addGLEventListener(this); // (7)
+
+		animator = new Animator(); // (8)
+		animator.add(glWindow);
+		animator.start();
+		glWindow.setVisible(true); // (10)
+	}
+
+	@Override
+	public void init(GLAutoDrawable drawable) {
+		GL2 gl = drawable.getGL().getGL2();// 追加
+		// ウィンドウを青く塗りつぶす
+		gl.glClearColor(0.0f, 0.0f, 1.0f, 1.0f);// 追加
+	}
+
+	@Override
+	public void reshape(GLAutoDrawable drawable, int x, int y, int width, int height) {
+	}
+
+	long cnt = 0;
+
+	@Override
+	public void display(GLAutoDrawable drawable) {
+		GL2 gl = drawable.getGL().getGL2();// 追加
+		gl.glClear(GL.GL_COLOR_BUFFER_BIT);// 追加
+		gl.glBegin(GL.GL_LINE_LOOP);
+		gl.glVertex2f(-0.9f, -0.9f);
+		gl.glVertex2f(0.9f, -0.9f);
+		gl.glVertex2f(0.9f, 0.9f);
+		gl.glVertex2f(-0.9f, 0.9f);
+		gl.glEnd();
+
+		cnt++;
+		// X軸回転
+		gl.glRotatef(1.0f, 1.0f, 0.0f, 0.0f);
+		// Y軸回転
+		gl.glRotatef(1.5f, 0.0f, 1.0f, 0.0f);
+
+		// 文字列を描画
+		Font font = new Font("MSゴシック", java.awt.Font.PLAIN, 10);
+		TextRenderer tr = new TextRenderer(font, true, true);
+		tr.beginRendering(width, height);
+		tr.setColor(1f, 1f, 0.5f, 1.0f);
+		for (int i = 0; i < cnt && i < 20; i++) {
+			tr.draw("テキスト漢字OK" + i, 20, 20 + (i * 10));
+		}
+	
+		tr.endRendering();
 
 	}
 
-	int i = 0;
-	/**
-	 * テクスチャ描画確認
-	 * @param gc
-	 */
-	private void drawShapes(GraphicsContext gc) {
-//		gc.setFontSmoothingType(FontSmoothingType.LCD);
-		gc.setFill(Paint.valueOf("#FF0000"));
-		gc.fillRect(0, 0, WIDTH, HEIGHT);
-		gc.setFill(Paint.valueOf("#FFFFFF"));
-//		gc.clearRect(0, 0, 100, 100);
-		gc.fillText(String.valueOf(i++), WIDTH / 2, HEIGHT / 2);
-
+	@Override
+	public void dispose(GLAutoDrawable drawable) {
+		if (animator != null)
+			animator.stop();
 	}
 
 }
